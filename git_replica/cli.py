@@ -47,8 +47,7 @@ def create(app_type, app_name, framework, path):
 
 
 @main.command()
-@click.option('--all', is_flag=True, help='List all repositories')
-def list(all):
+def list():
     """List repositories managed by Git Replica."""
     manager = RepoManager()
     repos = manager.list_repos()

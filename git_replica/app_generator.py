@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Optional
 from jinja2 import Template
 import yaml
 
@@ -199,7 +200,7 @@ app = FastAPI(title="''' + app_name + '''")
 class Item(BaseModel):
     id: int
     name: str
-    description: str = None
+    description: Optional[str] = None
 
 items = []
 
@@ -218,10 +219,11 @@ def create_item(item: Item):
 
 @app.get("/items/{item_id}", response_model=Item)
 def get_item(item_id: int):
+    from fastapi import HTTPException
     for item in items:
         if item.id == item_id:
             return item
-    return {"error": "Item not found"}
+    raise HTTPException(status_code=404, detail="Item not found")
 
 if __name__ == "__main__":
     import uvicorn
