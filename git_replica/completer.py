@@ -940,8 +940,44 @@ class CompletionEngine:
                         "NotImplementedError", "AttributeError", "IndexError",
                         "PermissionError", "FileNotFoundError", "OSError"]:
                 results.append(Completion(label=exc, insert_text=f'{exc}("${{0:message}}")', kind="keyword", detail=exc, sort_key=f"0_{exc}"))
+        elif trigger == "for_loop":
+            results.append(Completion(
+                label="for",
+                insert_text="for ${1:item} in ${2:iterable}:\n    ${0:pass}",
+                kind="snippet", detail="for loop", sort_key="0_for",
+            ))
+            results.append(Completion(
+                label="for_enumerate",
+                insert_text="for ${1:i}, ${2:item} in enumerate(${3:iterable}):\n    ${0:pass}",
+                kind="snippet", detail="for with enumerate", sort_key="0_for_enumerate",
+            ))
+            results.append(Completion(
+                label="for_range",
+                insert_text="for ${1:i} in range(${2:n}):\n    ${0:pass}",
+                kind="snippet", detail="for i in range(n)", sort_key="0_for_range",
+            ))
+        elif trigger == "if_stmt":
+            results.append(Completion(
+                label="if",
+                insert_text="if ${1:condition}:\n    ${0:pass}",
+                kind="snippet", detail="if statement", sort_key="0_if",
+            ))
+            results.append(Completion(
+                label="if_else",
+                insert_text="if ${1:condition}:\n    ${2:pass}\nelse:\n    ${0:pass}",
+                kind="snippet", detail="if/else", sort_key="0_if_else",
+            ))
+            results.append(Completion(
+                label="if_isinstance",
+                insert_text="if isinstance(${1:obj}, ${2:type}):\n    ${0:pass}",
+                kind="snippet", detail="isinstance check", sort_key="0_if_isinstance",
+            ))
         elif trigger == "blank_line":
             results.extend(self._snippets.search("", language, limit=10))
+        elif trigger is not None:
+            # Generic fallback: search snippets with the trigger keyword
+            kw = trigger.split("_")[0]
+            results.extend(self._snippets.search(kw, language, limit=5))
 
         return results
 

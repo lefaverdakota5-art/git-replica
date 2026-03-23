@@ -9,12 +9,12 @@ import os
 import shutil
 import subprocess
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import git
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -122,7 +122,7 @@ class CompleteRequest(BaseModel):
 
 
 class ScaffoldRequest(BaseModel):
-    prompt: str
+    prompt: str = ""
     app_type: str = "api"
     app_name: str = "my-app"
     framework: Optional[str] = None
@@ -174,7 +174,7 @@ class DeployConfig(BaseModel):
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "service": "prometheus", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "ok", "service": "prometheus", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/api/stats")
@@ -208,7 +208,7 @@ def list_projects():
 @app.post("/api/projects", status_code=201)
 def create_project(body: ProjectCreate):
     project_id = str(uuid.uuid4())[:8]
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     project = {
         "id": project_id,
         "name": body.name,
@@ -260,7 +260,7 @@ def update_project(project_id: str, body: ProjectUpdate):
                 p["framework"] = body.framework
             if body.status is not None:
                 p["status"] = body.status
-            p["updated_at"] = datetime.utcnow().isoformat()
+            p["updated_at"] = datetime.now(timezone.utc).isoformat()
             save_projects(projects)
             return p
     raise HTTPException(status_code=404, detail="Project not found")
@@ -286,9 +286,8 @@ def delete_project(project_id: str):
 def _file_tree(directory: Path, base: Path) -> List[Dict]:
     items = []
     try:
-        # Pre-compute is_file() to avoid repeated stat calls during sort
-        entries = [(item, item.is_file()) for item in directory.iterdir()]
-        for item, is_file in sorted(entries, key=lambda t: (t[1], t[0].name)):
+        entries = sorted(directory.iterdir(), key=lambda p: (p.is_file(), p.name))
+        for item in entries:
             rel = str(item.relative_to(base))
             if item.is_dir():
                 items.append({
@@ -392,7 +391,7 @@ def complete_code(body: CompleteRequest):
     cursor_line = min(body.line, len(lines) - 1) if lines else 0
     code_before = "\n".join(lines[:cursor_line + 1])
     current_line = lines[cursor_line] if lines else ""
-    completions = engine.complete(code_before, current_line, body.language)
+    completions = engine.complete(code_before, body.language)
     return {
         "completions": [
             {"label": c.label, "insert_text": c.insert_text, "kind": c.kind, "detail": c.detail}
@@ -406,6 +405,9 @@ def scaffold_app(body: ScaffoldRequest):
     gen = AppGenerator()
     base = str(PROJECTS_DIR / (body.project_id or "scaffold_tmp"))
     Path(base).mkdir(parents=True, exist_ok=True)
+    app_path = Path(base) / body.app_name
+    if app_path.exists():
+        shutil.rmtree(app_path)
     try:
         path = gen.create_app(body.app_type, body.app_name, body.framework, base)
         files = []
@@ -437,7 +439,7 @@ def generate_types(body: TypesRequest):
 @app.post("/api/generate/imports")
 def generate_imports(body: ImportsRequest):
     engine = CompletionEngine()
-    suggestions = engine.suggest_imports(body.code, body.language)
+    suggestions = engine.suggest_imports(body.code)
     return {"imports": suggestions}
 
 
@@ -471,7 +473,7 @@ TEMPLATES = [
 
 @app.get("/api/templates")
 def list_templates():
-    return {"templates": TEMPLATES}
+    return TEMPLATES
 
 
 # ---------------------------------------------------------------------------
@@ -515,7 +517,7 @@ def run_project(project_id: str):
     for p in projects:
         if p["id"] == project_id:
             p["status"] = "running" if result["success"] else "error"
-            p["updated_at"] = datetime.utcnow().isoformat()
+            p["updated_at"] = datetime.now(timezone.utc).isoformat()
     save_projects(projects)
     return {
         "command": cmd,
@@ -635,7 +637,7 @@ def install_packages(project_id: str, body: PackageInstallRequest):
 # ---------------------------------------------------------------------------
 
 @app.post("/api/projects/{project_id}/deploy")
-def create_deploy(project_id: str, body: DeployConfig):
+def create_deploy(project_id: str, body: DeployConfig = Body(default=DeployConfig())):
     project = get_project(project_id)
     pd = project_dir(project_id)
 
