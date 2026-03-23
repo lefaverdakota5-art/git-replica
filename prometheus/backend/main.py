@@ -286,7 +286,9 @@ def delete_project(project_id: str):
 def _file_tree(directory: Path, base: Path) -> List[Dict]:
     items = []
     try:
-        for item in sorted(directory.iterdir(), key=lambda x: (x.is_file(), x.name)):
+        # Pre-compute is_file() to avoid repeated stat calls during sort
+        entries = [(item, item.is_file()) for item in directory.iterdir()]
+        for item, is_file in sorted(entries, key=lambda t: (t[1], t[0].name)):
             rel = str(item.relative_to(base))
             if item.is_dir():
                 items.append({
