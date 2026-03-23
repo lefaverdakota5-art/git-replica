@@ -122,6 +122,64 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT License - feel free to use this project for your personal and commercial projects.
 
+## GitHub Models — AI Inference Samples
+
+The `samples/github-models/` directory contains ready-to-run Node.js examples that call the [GitHub Models](https://github.com/marketplace/models) inference endpoint using your GitHub personal access token.
+
+### Prerequisites
+
+1. **Node.js** — install from [nodejs.org](https://nodejs.org/).
+2. **GitHub token** — create a personal access token (classic or fine-grained) in your GitHub settings.
+3. Set the token in your shell:
+
+   ```bash
+   # bash / zsh
+   export GITHUB_TOKEN="YOUR-GITHUB-TOKEN-GOES-HERE"
+
+   # PowerShell
+   $Env:GITHUB_TOKEN="YOUR-GITHUB-TOKEN-GOES-HERE"
+
+   # Windows Command Prompt
+   set GITHUB_TOKEN=YOUR-GITHUB-TOKEN-GOES-HERE
+   ```
+
+4. Install dependencies:
+
+   ```bash
+   cd samples/github-models
+   npm install
+   ```
+
+### Run the basic sample
+
+```bash
+node sample.js
+```
+
+Sends a single chat completion request and prints the response.
+
+### Run the streaming sample
+
+```bash
+node sample-stream.js
+```
+
+Streams the response token-by-token to stdout.
+
+### Using external / bring-your-own-key models
+
+If you have external models configured in your account, reference them with:
+
+```
+custom/<key_id>/<model_id>
+```
+
+Set `model` in `sample.js` or `sample-stream.js` to that string, for example:
+
+```js
+const model = "custom/my-key/my-model-id";
+```
+
 ## About
 
 Created with the vision of having a personal development assistant that combines the power of Git repository management with intelligent app scaffolding and code generation.
