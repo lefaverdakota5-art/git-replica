@@ -1,11 +1,11 @@
-"""Application generation with AI assistance."""
+"""
+Application generation with AI assistance.
+"""
 
 import os
 from pathlib import Path
 from typing import Optional
-from jinja2 import Template
-import yaml
-
+import openai
 
 class AppGenerator:
     """Generates applications using templates and AI assistance."""
@@ -13,8 +13,9 @@ class AppGenerator:
     def __init__(self):
         """Initialize app generator."""
         self.templates_dir = Path(__file__).parent / 'templates'
+        self.client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
     
-    def create_app(self, app_type, app_name, framework=None, base_path='.'):
+    def create_app(self, app_type, app_name, framework=None, base_path='.'): 
         """Create a new application based on type."""
         app_path = Path(base_path) / app_name
         
@@ -178,7 +179,7 @@ main {
         
         # Create README
         self._create_readme(app_path, app_name, 'Flask web application', 
-                           'pip install -r requirements.txt\npython app.py')
+                           'pip install -r requirements.txt\npip install -e .\npython app.py')
     
     def _create_api_app(self, app_path, app_name, framework):
         """Create an API application."""
@@ -389,44 +390,23 @@ MIT
 ''')
     
     def generate_code(self, prompt, language='python'):
-        """Generate code based on prompt (AI stub)."""
-        # This is a simplified version without actual AI integration
-        # In a real implementation, this would call an AI API
+        """Generate code based on prompt using OpenAI."""
+        if not os.getenv('OPENAI_API_KEY'):
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
         
-        templates = {
-            'python': '''# Generated code for: {prompt}
-
-def main():
-    """Main function."""
-    print("Hello from generated code!")
-    # TODO: Implement your logic here
-    pass
-
-if __name__ == "__main__":
-    main()
-''',
-            'javascript': '''// Generated code for: {prompt}
-
-function main() {{
-    console.log("Hello from generated code!");
-    // TODO: Implement your logic here
-}}
-
-main();
-''',
-            'html': '''<!-- Generated code for: {prompt} -->
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Generated Page</title>
-</head>
-<body>
-    <h1>Generated HTML</h1>
-    <!-- TODO: Add your content here -->
-</body>
-</html>
-'''
-        }
+        system_prompt = f"You are a code generator. Generate {language} code based on the user's prompt. Provide only the code, no explanations."
+        user_prompt = f"Generate {language} code for: {prompt}"
         
-        template = templates.get(language, templates['python'])
-        return template.format(prompt=prompt)
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.7
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            raise Exception(f"Failed to generate code: {e}")
