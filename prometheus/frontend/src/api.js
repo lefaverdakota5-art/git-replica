@@ -15,6 +15,18 @@ async function req(method, path, body) {
   return res.json();
 }
 
+async function upload(path, file, limit) {
+  const form = new FormData();
+  form.append("file", file);
+  const suffix = limit ? `?limit=${encodeURIComponent(limit)}` : "";
+  const res = await fetch(BASE + path + suffix, { method: "POST", body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
 const api = {
   // Health
   health: () => req("GET", "/api/health"),
@@ -74,6 +86,12 @@ const api = {
   createDeploy: (projectId, config = {}) =>
     req("POST", `/api/projects/${projectId}/deploy`, { port: 8000, env_vars: {}, ...config }),
   getDeploy: (projectId) => req("GET", `/api/projects/${projectId}/deploy`),
+
+  // Private local visual library
+  indexVisualImage: (projectId, file) =>
+    upload(`/api/projects/${projectId}/visual-search/index`, file),
+  searchVisualImages: (projectId, file, limit = 20) =>
+    upload(`/api/projects/${projectId}/visual-search/search`, file, limit),
 };
 
 export default api;

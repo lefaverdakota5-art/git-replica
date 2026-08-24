@@ -42,6 +42,22 @@ npm run dev
 - **Deploy** — Auto-generate Dockerfile + docker-compose
 - **Terminal** — Execute shell commands in project dir
 - **Cyberpunk UI** — Royal Red, Gold, Black Neon theme
+- **Private Visual Search** — Project-scoped image indexing and explainable exact/near-duplicate matching using SHA-256, perceptual hashes, color histograms, and color distance
+
+## Visual Search Scope
+
+The **Visual Search** page is a working project-local image library, not a
+claim of web-wide or semantic reverse image search. Upload a JPEG, PNG, WebP,
+or GIF to index it in a selected project's private library, then upload a query
+image to receive ranked evidence. Each match records its source filename,
+indexing time, dimensions, category, and individual signal scores.
+
+The system validates file types after decoding, bounds input to 25 MB and 40
+megapixels, corrects EXIF orientation before feature extraction, and stores
+only explicitly uploaded media in the local project directory. Video, audio,
+OCR, face recognition, model embeddings, and public-web retrieval require
+dedicated model runtimes/providers and are intentionally not represented as
+implemented by this component.
 
 ## Architecture
 
