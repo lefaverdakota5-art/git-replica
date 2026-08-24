@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import git
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Body
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,7 @@ from git_replica.code_generator import LocalCodeGenerator
 from git_replica.completer import CompletionEngine
 from git_replica.app_generator import AppGenerator
 from git_replica.runner import AppRunner
+from prometheus.backend.visual_search import LocalImageIndex, MAX_IMAGE_BYTES, MediaValidationError
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -84,6 +85,17 @@ def project_dir(project_id: str) -> Path:
     d = PROJECTS_DIR / project_id
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def resolve_project_path(project_id: str, requested_path: str) -> Path:
+    """Resolve a project-relative path without accepting sibling-prefix escapes."""
+    root = project_dir(project_id).resolve()
+    candidate = (root / requested_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Path traversal not allowed") from error
+    return candidate
 
 
 # ---------------------------------------------------------------------------
@@ -318,10 +330,7 @@ def list_files(project_id: str):
 @app.get("/api/projects/{project_id}/files/{file_path:path}")
 def read_file(project_id: str, file_path: str):
     get_project(project_id)
-    pd = project_dir(project_id)
-    fp = (pd / file_path).resolve()
-    if not str(fp).startswith(str(pd)):
-        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+    fp = resolve_project_path(project_id, file_path)
     if not fp.exists():
         raise HTTPException(status_code=404, detail="File not found")
     if fp.is_dir():
@@ -336,10 +345,7 @@ def read_file(project_id: str, file_path: str):
 @app.post("/api/projects/{project_id}/files/{file_path:path}", status_code=201)
 def create_file(project_id: str, file_path: str, body: FileWrite):
     get_project(project_id)
-    pd = project_dir(project_id)
-    fp = (pd / file_path).resolve()
-    if not str(fp).startswith(str(pd)):
-        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+    fp = resolve_project_path(project_id, file_path)
     fp.parent.mkdir(parents=True, exist_ok=True)
     fp.write_text(body.content, encoding=body.encoding)
     return {"path": file_path, "size": fp.stat().st_size, "created": True}
@@ -348,10 +354,7 @@ def create_file(project_id: str, file_path: str, body: FileWrite):
 @app.put("/api/projects/{project_id}/files/{file_path:path}")
 def update_file(project_id: str, file_path: str, body: FileWrite):
     get_project(project_id)
-    pd = project_dir(project_id)
-    fp = (pd / file_path).resolve()
-    if not str(fp).startswith(str(pd)):
-        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+    fp = resolve_project_path(project_id, file_path)
     if not fp.exists():
         fp.parent.mkdir(parents=True, exist_ok=True)
     fp.write_text(body.content, encoding=body.encoding)
@@ -361,16 +364,78 @@ def update_file(project_id: str, file_path: str, body: FileWrite):
 @app.delete("/api/projects/{project_id}/files/{file_path:path}", status_code=204)
 def delete_file(project_id: str, file_path: str):
     get_project(project_id)
-    pd = project_dir(project_id)
-    fp = (pd / file_path).resolve()
-    if not str(fp).startswith(str(pd)):
-        raise HTTPException(status_code=400, detail="Path traversal not allowed")
+    fp = resolve_project_path(project_id, file_path)
     if not fp.exists():
         raise HTTPException(status_code=404, detail="File not found")
     if fp.is_file():
         fp.unlink()
     else:
         shutil.rmtree(str(fp))
+
+
+# ---------------------------------------------------------------------------
+# Local visual search
+# ---------------------------------------------------------------------------
+
+async def _read_image_upload(upload: UploadFile) -> bytes:
+    """Read a bounded image upload and always release the temporary handle."""
+    try:
+        data = await upload.read(MAX_IMAGE_BYTES + 1)
+    finally:
+        await upload.close()
+    if len(data) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Images must be 25 MB or smaller.")
+    if not data:
+        raise HTTPException(status_code=422, detail="The uploaded file is empty.")
+    return data
+
+
+@app.post("/api/projects/{project_id}/visual-search/index", status_code=201)
+async def index_visual_image(project_id: str, file: UploadFile = File(...)):
+    """Index an explicitly uploaded image in the project's private local library."""
+    get_project(project_id)
+    if not file.filename:
+        raise HTTPException(status_code=422, detail="An image filename is required.")
+    data = await _read_image_upload(file)
+    try:
+        item = LocalImageIndex(project_dir(project_id)).add(
+            filename=file.filename,
+            content_type=file.content_type or "",
+            data=data,
+        )
+    except MediaValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {
+        "id": item.id,
+        "filename": item.filename,
+        "indexed_at": item.indexed_at,
+        "dimensions": {"width": item.features.width, "height": item.features.height},
+        "message": "Image indexed in this project's private visual library.",
+    }
+
+
+@app.post("/api/projects/{project_id}/visual-search/search")
+async def search_visual_images(
+    project_id: str,
+    file: UploadFile = File(...),
+    limit: int = 20,
+):
+    """Match an uploaded image against images previously indexed in this project."""
+    get_project(project_id)
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 100.")
+    data = await _read_image_upload(file)
+    try:
+        results = LocalImageIndex(project_dir(project_id)).search(data, limit=limit)
+    except MediaValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return {
+        "scope": "project_local_library",
+        "retrieved_at": datetime.now(timezone.utc).isoformat(),
+        "result_count": len(results),
+        "results": results,
+        "notice": "Results use deterministic pixel, color, and histogram signals. They do not claim web-wide, semantic, face, audio, or video matching.",
+    }
 
 
 # ---------------------------------------------------------------------------

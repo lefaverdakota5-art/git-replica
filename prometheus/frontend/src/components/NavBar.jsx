@@ -17,6 +17,9 @@ export default function NavBar() {
         <NavLink to="/system" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
           System Control
         </NavLink>
+        <NavLink to="/visual-search" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
+          Visual Search
+        </NavLink>
       </div>
       <style>{`
         .navbar {

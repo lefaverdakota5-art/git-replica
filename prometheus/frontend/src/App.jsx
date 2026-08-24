@@ -5,6 +5,7 @@ import Landing from "./pages/Landing";
 import Projects from "./pages/Projects";
 import Builder from "./pages/Builder";
 import SystemControl from "./pages/SystemControl";
+import VisualSearch from "./pages/VisualSearch";
 
 export default function App() {
   const location = useLocation();
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/projects" element={<Projects />} />
         <Route path="/builder/:projectId" element={<Builder />} />
         <Route path="/system" element={<SystemControl />} />
+        <Route path="/visual-search" element={<VisualSearch />} />
       </Routes>
     </div>
   );
