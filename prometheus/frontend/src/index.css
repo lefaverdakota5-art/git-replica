@@ -30,12 +30,15 @@
 
 html { font-size: 14px; }
 
+html, body, #root { min-height: 100%; }
+
 body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
   line-height: 1.6;
   overflow-x: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
 a { color: var(--red-bright); text-decoration: none; }
@@ -302,3 +305,8 @@ code, pre, .mono {
 .visual-provenance { color: var(--text-dim); font-size: 0.7rem; margin-top: 13px; }
 .visual-empty { border: 1px dashed var(--border); color: var(--text-dim); padding: 35px 24px; text-align: center; border-radius: var(--radius); }
 @media (max-width: 760px) { .visual-page { width: min(100% - 28px, 1180px); padding-top: 32px; } .visual-workspace { grid-template-columns: 1fr; } .visual-grid { grid-template-columns: 1fr; } }
+
+@media (max-width: 760px) {
+  .cyber-btn { width: 100%; justify-content: center; }
+  .cyber-card { padding: 16px; }
+}

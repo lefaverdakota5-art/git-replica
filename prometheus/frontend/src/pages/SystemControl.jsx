@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import api from "../api";
 import Terminal from "../components/Terminal";
+import {
+  getEditorSettings,
+  getStoredApiBaseUrl,
+  isNativeShell,
+  normalizeApiBaseUrl,
+  setPersistedEditorSettings,
+  setStoredApiBaseUrl,
+} from "../config";
 
 const TABS = ["Overview", "Generator", "Completion", "Packages", "Terminal", "Settings"];
 
@@ -20,11 +28,16 @@ export default function SystemControl() {
   const [termOutput, setTermOutput] = useState("");
   const [termProjectId, setTermProjectId] = useState("");
   const [projects, setProjects] = useState([]);
-  const [editorSettings, setEditorSettings] = useState({ fontSize: 13, wordWrap: "on", minimap: false });
+  const [editorSettings, setEditorSettings] = useState(() => getEditorSettings());
+  const [apiBaseInput, setApiBaseInput] = useState(() => getStoredApiBaseUrl());
+  const [settingsNotice, setSettingsNotice] = useState("");
+  const [backendCheck, setBackendCheck] = useState({ status: "idle", message: "" });
 
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
     api.listProjects().then(setProjects).catch(() => {});
+    setEditorSettings(getEditorSettings());
+    setApiBaseInput(getStoredApiBaseUrl());
   }, []);
 
   const handleGenerate = async () => {
@@ -46,7 +59,7 @@ export default function SystemControl() {
     try {
       const r = await api.complete(complCode, complLang, 0);
       setCompletions(r.completions || []);
-    } catch (e) {
+    } catch (_) {
       setCompletions([]);
     } finally {
       setComplLoading(false);
@@ -58,10 +71,10 @@ export default function SystemControl() {
     const pkgs = pkgInput.trim().split(/[\s,]+/).filter(Boolean);
     setPkgOutput("Installing…");
     try {
-      const r = await api.installPackages("_global_", pkgs, "pip").catch(async () => {
-        // Fallback: no project, just show what would run
-        return { output: `Would run: pip install ${pkgs.join(" ")}`, success: false };
-      });
+      const r = await api.installPackages("_global_", pkgs, "pip").catch(async () => ({
+        output: `Would run: pip install ${pkgs.join(" ")}`,
+        success: false,
+      }));
       setPkgOutput(r.output);
     } catch (e) {
       setPkgOutput("Error: " + e.message);
@@ -81,25 +94,53 @@ export default function SystemControl() {
     }
   };
 
+  const handleSaveSettings = () => {
+    setPersistedEditorSettings(editorSettings);
+    const normalized = setStoredApiBaseUrl(apiBaseInput);
+    setApiBaseInput(normalized);
+    setSettingsNotice(normalized
+      ? "Saved editor preferences and backend URL."
+      : "Saved editor preferences. The web build will keep using same-origin /api routes.");
+    setBackendCheck({ status: "idle", message: "" });
+  };
+
+  const handleCheckBackend = async () => {
+    const normalized = normalizeApiBaseUrl(apiBaseInput);
+    if (!normalized) {
+      setBackendCheck({ status: "error", message: "Enter the full backend origin first, for example https://your-server.example.com:8000" });
+      return;
+    }
+    setBackendCheck({ status: "checking", message: "Checking backend…" });
+    try {
+      const res = await fetch(`${normalized}/api/health`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const body = await res.json();
+      setBackendCheck({ status: "ok", message: `Connected to ${body.service || "backend"} (${body.status || "ok"}).` });
+    } catch (error) {
+      setBackendCheck({ status: "error", message: `Could not reach ${normalized}/api/health: ${error.message}` });
+    }
+  };
+
   return (
     <div style={{ padding: "28px 32px", maxWidth: 1100, margin: "0 auto" }}>
-      <h1 style={{
-        fontFamily: "var(--font-code)",
-        fontSize: "1.5rem",
-        fontWeight: 700,
-        letterSpacing: "0.12em",
-        marginBottom: 4,
-        color: "var(--red-bright)",
-        textShadow: "0 0 15px rgba(255,0,51,0.4)",
-      }}>
+      <h1
+        style={{
+          fontFamily: "var(--font-code)",
+          fontSize: "1.5rem",
+          fontWeight: 700,
+          letterSpacing: "0.12em",
+          marginBottom: 4,
+          color: "var(--red-bright)",
+          textShadow: "0 0 15px rgba(255,0,51,0.4)",
+        }}
+      >
         ⚙ SYSTEM CONTROL
       </h1>
       <p style={{ color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: 28 }}>
         Prometheus AI Engine · Local Code Intelligence · No external APIs
       </p>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "1px solid var(--border)", paddingBottom: 0 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 24, borderBottom: "1px solid var(--border)", paddingBottom: 0, flexWrap: "wrap" }}>
         {TABS.map((t) => (
           <button
             key={t}
@@ -124,7 +165,6 @@ export default function SystemControl() {
         ))}
       </div>
 
-      {/* Overview */}
       {tab === "Overview" && (
         <div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
@@ -156,9 +196,8 @@ export default function SystemControl() {
         </div>
       )}
 
-      {/* Generator */}
       {tab === "Generator" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
           <div className="cyber-card" style={{ padding: 20 }}>
             <h3 style={{ marginBottom: 14, fontSize: "0.8rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Input</h3>
             <textarea
@@ -169,37 +208,24 @@ export default function SystemControl() {
               onChange={(e) => setGenPrompt(e.target.value)}
               style={{ resize: "none", marginBottom: 12 }}
             />
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <select className="cyber-input" style={{ width: 150 }} value={genLang} onChange={(e) => setGenLang(e.target.value)}>
-                {["python","javascript","typescript","go","rust","bash"].map(l => <option key={l}>{l}</option>)}
+                {["python", "javascript", "typescript", "go", "rust", "bash"].map((l) => <option key={l}>{l}</option>)}
               </select>
               <button className="cyber-btn primary" onClick={handleGenerate} disabled={genLoading}>{genLoading ? "Generating…" : "⚡ Generate"}</button>
             </div>
           </div>
           <div className="cyber-card" style={{ padding: 20 }}>
             <h3 style={{ marginBottom: 14, fontSize: "0.8rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Output</h3>
-            <pre style={{
-              background: "var(--bg)",
-              border: "1px solid var(--border)",
-              borderRadius: 4,
-              padding: 14,
-              height: 220,
-              overflow: "auto",
-              fontFamily: "var(--font-code)",
-              fontSize: "0.78rem",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              color: "#ccc",
-            }}>
+            <pre style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 4, padding: 14, height: 220, overflow: "auto", fontFamily: "var(--font-code)", fontSize: "0.78rem", whiteSpace: "pre-wrap", wordBreak: "break-word", color: "#ccc" }}>
               {genResult || <span style={{ color: "var(--text-dim)" }}>Generated code will appear here…</span>}
             </pre>
           </div>
         </div>
       )}
 
-      {/* Completion */}
       {tab === "Completion" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
           <div className="cyber-card" style={{ padding: 20 }}>
             <h3 style={{ marginBottom: 14, fontSize: "0.8rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Code Input</h3>
             <textarea
@@ -210,9 +236,9 @@ export default function SystemControl() {
               onChange={(e) => setComplCode(e.target.value)}
               style={{ resize: "none", fontFamily: "var(--font-code)", fontSize: "0.78rem", marginBottom: 12 }}
             />
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <select className="cyber-input" style={{ width: 150 }} value={complLang} onChange={(e) => setComplLang(e.target.value)}>
-                {["python","javascript","typescript","go","rust","bash"].map(l => <option key={l}>{l}</option>)}
+                {["python", "javascript", "typescript", "go", "rust", "bash"].map((l) => <option key={l}>{l}</option>)}
               </select>
               <button className="cyber-btn primary" onClick={handleComplete} disabled={complLoading}>{complLoading ? "…" : "Complete"}</button>
             </div>
@@ -226,7 +252,7 @@ export default function SystemControl() {
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                      {["Label","Kind","Detail"].map(h => <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "var(--text-dim)", fontWeight: 600 }}>{h}</th>)}
+                      {["Label", "Kind", "Detail"].map((h) => <th key={h} style={{ textAlign: "left", padding: "4px 8px", color: "var(--text-dim)", fontWeight: 600 }}>{h}</th>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -245,11 +271,10 @@ export default function SystemControl() {
         </div>
       )}
 
-      {/* Packages */}
       {tab === "Packages" && (
         <div className="cyber-card" style={{ padding: 24 }}>
           <h3 style={{ marginBottom: 16, fontSize: "0.8rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Install Packages</h3>
-          <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
             <input className="cyber-input" placeholder="Package names (space/comma separated)…" value={pkgInput} onChange={(e) => setPkgInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleInstallPkg()} />
             <button className="cyber-btn primary" onClick={handleInstallPkg}>Install</button>
           </div>
@@ -261,10 +286,9 @@ export default function SystemControl() {
         </div>
       )}
 
-      {/* Terminal */}
       {tab === "Terminal" && (
         <div className="cyber-card" style={{ padding: 20 }}>
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
             <label style={{ fontSize: "0.75rem", color: "var(--text-dim)", whiteSpace: "nowrap" }}>Project:</label>
             <select className="cyber-input" style={{ maxWidth: 300 }} value={termProjectId} onChange={(e) => setTermProjectId(e.target.value)}>
               <option value="">-- Select project --</option>
@@ -275,22 +299,42 @@ export default function SystemControl() {
         </div>
       )}
 
-      {/* Settings */}
       {tab === "Settings" && (
         <div className="cyber-card" style={{ padding: 24 }}>
-          <h3 style={{ marginBottom: 20, fontSize: "0.8rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Editor Preferences</h3>
-          <div style={{ display: "grid", gap: 16, maxWidth: 400 }}>
+          <h3 style={{ marginBottom: 20, fontSize: "0.8rem", textTransform: "uppercase", color: "var(--text-dim)" }}>Android + Editor Preferences</h3>
+          <div style={{ display: "grid", gap: 18, maxWidth: 520 }}>
+            <div>
+              <label style={{ display: "block", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 6 }}>Backend URL</label>
+              <input
+                className="cyber-input"
+                value={apiBaseInput}
+                onChange={(e) => setApiBaseInput(e.target.value)}
+                placeholder="https://your-server.example.com:8000"
+              />
+              <p style={{ marginTop: 8, fontSize: "0.74rem", color: "var(--text-dim)" }}>
+                {isNativeShell()
+                  ? "Required on Android so the APK can reach your FastAPI backend over the network."
+                  : "Optional in the browser. Leave empty to keep using the current site's /api and /ws routes."}
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="cyber-btn primary" onClick={handleSaveSettings}>Save Settings</button>
+              <button className="cyber-btn" onClick={handleCheckBackend}>Test Backend</button>
+            </div>
+            {settingsNotice && <p style={{ fontSize: "0.76rem", color: "var(--gold)" }}>{settingsNotice}</p>}
+            {backendCheck.message && (
+              <p style={{ fontSize: "0.76rem", color: backendCheck.status === "ok" ? "#00c850" : backendCheck.status === "checking" ? "var(--gold)" : "var(--red-bright)" }}>
+                {backendCheck.message}
+              </p>
+            )}
             <div>
               <label style={{ display: "block", fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-dim)", marginBottom: 6 }}>Font Size</label>
-              <input type="range" min={10} max={20} value={editorSettings.fontSize}
-                onChange={(e) => setEditorSettings({ ...editorSettings, fontSize: +e.target.value })}
-                style={{ width: "100%" }} />
+              <input type="range" min={10} max={20} value={editorSettings.fontSize} onChange={(e) => setEditorSettings({ ...editorSettings, fontSize: +e.target.value })} style={{ width: "100%" }} />
               <span style={{ fontSize: "0.75rem", color: "var(--gold)" }}>{editorSettings.fontSize}px</span>
             </div>
             <div>
               <label style={{ display: "flex", gap: 10, alignItems: "center", cursor: "pointer", fontSize: "0.8rem" }}>
-                <input type="checkbox" checked={editorSettings.minimap}
-                  onChange={(e) => setEditorSettings({ ...editorSettings, minimap: e.target.checked })} />
+                <input type="checkbox" checked={editorSettings.minimap} onChange={(e) => setEditorSettings({ ...editorSettings, minimap: e.target.checked })} />
                 Show Minimap
               </label>
             </div>
@@ -304,7 +348,7 @@ export default function SystemControl() {
             </div>
           </div>
           <p style={{ marginTop: 20, fontSize: "0.75rem", color: "var(--text-dim)" }}>
-            Settings are saved in memory. Restart the app to apply to the Builder editor.
+            Saved editor settings apply to the Builder immediately the next time it gains focus.
           </p>
         </div>
       )}

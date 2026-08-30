@@ -44,26 +44,30 @@ export default function Landing() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", position: "relative", overflow: "hidden" }}>
-      {/* Scanline overlay */}
-      <div style={{
-        position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
-        background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)",
-      }} />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)",
+        }}
+      />
 
       <div style={{ position: "relative", zIndex: 1, maxWidth: 900, margin: "0 auto", padding: "60px 24px 40px" }}>
-
-        {/* Hero */}
         <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <h1 style={{
-            fontFamily: "var(--font-code)",
-            fontSize: "clamp(2.5rem, 8vw, 5rem)",
-            fontWeight: 700,
-            letterSpacing: "0.15em",
-            animation: "flicker 5s infinite",
-            color: "var(--red-bright)",
-            textShadow: "0 0 20px rgba(255,0,51,0.5), 0 0 60px rgba(255,0,51,0.2)",
-            marginBottom: 12,
-          }}>
+          <h1
+            style={{
+              fontFamily: "var(--font-code)",
+              fontSize: "clamp(2.5rem, 8vw, 5rem)",
+              fontWeight: 700,
+              letterSpacing: "0.15em",
+              animation: "flicker 5s infinite",
+              color: "var(--red-bright)",
+              textShadow: "0 0 20px rgba(255,0,51,0.5), 0 0 60px rgba(255,0,51,0.2)",
+              marginBottom: 12,
+            }}
+          >
             PROMETHEUS
           </h1>
           <p style={{ fontSize: "1.1rem", color: "var(--text-dim)", letterSpacing: "0.08em", marginBottom: 4 }}>
@@ -74,9 +78,8 @@ export default function Landing() {
           </p>
         </div>
 
-        {/* Stats */}
         {stats && (
-          <div style={{ display: "flex", justifyContent: "center", gap: 40, marginBottom: 48 }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 40, marginBottom: 48, flexWrap: "wrap" }}>
             {[
               { label: "Frameworks", value: stats.frameworks_supported },
               { label: "Snippets", value: stats.snippets_available + "+" },
@@ -91,7 +94,6 @@ export default function Landing() {
           </div>
         )}
 
-        {/* Main input */}
         <div className="cyber-card" style={{ marginBottom: 32 }}>
           <label style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", display: "block", marginBottom: 10 }}>
             What do you want to build?
@@ -102,22 +104,19 @@ export default function Landing() {
             placeholder="Describe your app… e.g. 'A REST API for managing tasks with user authentication'"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && e.ctrlKey) handleGenerate(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && e.ctrlKey) handleGenerate();
+            }}
             style={{ resize: "vertical", fontFamily: "var(--font-ui)" }}
           />
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, gap: 10 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12, gap: 10, flexWrap: "wrap" }}>
             <button className="cyber-btn" onClick={() => navigate("/projects")}>Browse Projects</button>
-            <button
-              className="cyber-btn primary"
-              onClick={handleGenerate}
-              disabled={loading || !prompt.trim()}
-            >
+            <button className="cyber-btn primary" onClick={handleGenerate} disabled={loading || !prompt.trim()}>
               {loading ? "⚡ Creating…" : "⚡ Generate"}
             </button>
           </div>
         </div>
 
-        {/* Suggestion cards */}
         <div style={{ marginBottom: 48 }}>
           <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 14 }}>
             Or try a template →
@@ -138,8 +137,14 @@ export default function Landing() {
                   transition: "all 0.2s",
                   borderRadius: "var(--radius)",
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.borderColor = "rgba(255,215,0,0.5)"; e.currentTarget.style.color = "var(--gold)"; }}
-                onMouseOut={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text)"; }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255,215,0,0.5)";
+                  e.currentTarget.style.color = "var(--gold)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
+                  e.currentTarget.style.color = "var(--text)";
+                }}
               >
                 <span style={{ fontSize: "0.82rem" }}>{s.label}</span>
               </button>
@@ -147,7 +152,6 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Recent projects */}
         {recentProjects.length > 0 && (
           <div>
             <p style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-dim)", marginBottom: 14 }}>
@@ -155,17 +159,30 @@ export default function Landing() {
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {recentProjects.map((p) => (
-                <a
+                <button
                   key={p.id}
-                  href={`/builder/${p.id}`}
+                  type="button"
+                  onClick={() => navigate(`/builder/${p.id}`)}
                   className="cyber-card"
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", textDecoration: "none" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    textDecoration: "none",
+                    width: "100%",
+                    background: "var(--surface-1)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    gap: 12,
+                    flexWrap: "wrap",
+                  }}
                 >
                   <span style={{ fontWeight: 600, color: "var(--text)" }}>{p.name}</span>
                   <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", fontFamily: "var(--font-code)" }}>
                     {p.framework} · {new Date(p.updated_at).toLocaleDateString()}
                   </span>
-                </a>
+                </button>
               ))}
             </div>
           </div>

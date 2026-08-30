@@ -11,32 +11,27 @@ export default function NavBar() {
         </span>
       </div>
       <div className="navbar-links">
-        <NavLink to="/projects" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
-          Projects
-        </NavLink>
-        <NavLink to="/system" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
-          System Control
-        </NavLink>
-        <NavLink to="/visual-search" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>
-          Visual Search
-        </NavLink>
+        <NavLink to="/projects" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>Projects</NavLink>
+        <NavLink to="/system" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>System Control</NavLink>
+        <NavLink to="/visual-search" className={({ isActive }) => "nav-link" + (isActive ? " active" : "")}>Visual Search</NavLink>
       </div>
       <style>{`
         .navbar {
           display: flex;
           align-items: center;
           padding: 0 24px;
-          height: 52px;
+          min-height: 52px;
           background: var(--surface-1);
           border-bottom: 2px solid var(--red-bright);
           box-shadow: 0 2px 20px rgba(255,0,51,0.2);
           position: sticky;
           top: 0;
           z-index: 100;
-          gap: 32px;
+          gap: 20px;
+          flex-wrap: wrap;
         }
-        .navbar-logo { flex-shrink: 0; }
-        .navbar-links { display: flex; gap: 8px; flex: 1; }
+        .navbar-logo { flex-shrink: 0; padding: 10px 0; }
+        .navbar-links { display: flex; gap: 8px; flex: 1; overflow-x: auto; padding: 10px 0; }
         .nav-link {
           color: var(--text-dim);
           font-size: 0.8rem;
@@ -48,6 +43,7 @@ export default function NavBar() {
           transition: all 0.2s;
           text-decoration: none;
           position: relative;
+          white-space: nowrap;
         }
         .nav-link::after {
           content: "";
@@ -63,6 +59,10 @@ export default function NavBar() {
         .nav-link:hover { color: var(--text); }
         .nav-link.active { color: var(--gold); }
         .nav-link.active::after { transform: scaleX(1); }
+        @media (max-width: 760px) {
+          .navbar { padding: 0 14px; gap: 8px; }
+          .navbar-links { width: 100%; }
+        }
       `}</style>
     </nav>
   );
