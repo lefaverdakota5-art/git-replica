@@ -5,6 +5,7 @@ import {
   getEditorSettings,
   getStoredApiBaseUrl,
   isNativeShell,
+  isValidApiBaseUrl,
   normalizeApiBaseUrl,
   setPersistedEditorSettings,
   setStoredApiBaseUrl,
@@ -36,8 +37,6 @@ export default function SystemControl() {
   useEffect(() => {
     api.stats().then(setStats).catch(() => {});
     api.listProjects().then(setProjects).catch(() => {});
-    setEditorSettings(getEditorSettings());
-    setApiBaseInput(getStoredApiBaseUrl());
   }, []);
 
   const handleGenerate = async () => {
@@ -95,8 +94,13 @@ export default function SystemControl() {
   };
 
   const handleSaveSettings = () => {
+    const normalized = normalizeApiBaseUrl(apiBaseInput);
+    if (normalized && !isValidApiBaseUrl(normalized)) {
+      setSettingsNotice("Enter a full http:// or https:// backend URL before saving.");
+      return;
+    }
     setPersistedEditorSettings(editorSettings);
-    const normalized = setStoredApiBaseUrl(apiBaseInput);
+    setStoredApiBaseUrl(normalized);
     setApiBaseInput(normalized);
     setSettingsNotice(normalized
       ? "Saved editor preferences and backend URL."
@@ -106,7 +110,7 @@ export default function SystemControl() {
 
   const handleCheckBackend = async () => {
     const normalized = normalizeApiBaseUrl(apiBaseInput);
-    if (!normalized) {
+    if (!normalized || !isValidApiBaseUrl(normalized)) {
       setBackendCheck({ status: "error", message: "Enter the full backend origin first, for example https://your-server.example.com:8000" });
       return;
     }

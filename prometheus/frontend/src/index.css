@@ -307,6 +307,5 @@ code, pre, .mono {
 @media (max-width: 760px) { .visual-page { width: min(100% - 28px, 1180px); padding-top: 32px; } .visual-workspace { grid-template-columns: 1fr; } .visual-grid { grid-template-columns: 1fr; } }
 
 @media (max-width: 760px) {
-  .cyber-btn { width: 100%; justify-content: center; }
   .cyber-card { padding: 16px; }
 }

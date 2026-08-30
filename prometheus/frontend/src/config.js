@@ -1,5 +1,3 @@
-import { Capacitor } from "@capacitor/core";
-
 const API_BASE_STORAGE_KEY = "prometheus.apiBaseUrl";
 const EDITOR_SETTINGS_STORAGE_KEY = "prometheus.editorSettings";
 const DEFAULT_EDITOR_SETTINGS = Object.freeze({
@@ -25,8 +23,19 @@ export function normalizeApiBaseUrl(value = "") {
   return value.trim().replace(/\/+$/, "");
 }
 
+export function isValidApiBaseUrl(value = "") {
+  const normalized = normalizeApiBaseUrl(value);
+  if (!normalized) return false;
+  try {
+    const url = new URL(normalized);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
 export function isNativeShell() {
-  return Capacitor.isNativePlatform();
+  return Boolean(hasWindow() && window.Capacitor?.isNativePlatform?.());
 }
 
 export function getStoredApiBaseUrl() {
@@ -49,8 +58,9 @@ export function setStoredApiBaseUrl(value) {
 
 export function getApiBaseUrl() {
   const stored = getStoredApiBaseUrl();
-  if (stored) return stored;
-  return normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL || "");
+  if (isValidApiBaseUrl(stored)) return stored;
+  const envBase = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL || "");
+  return isValidApiBaseUrl(envBase) ? envBase : "";
 }
 
 export function needsBackendConfiguration() {
@@ -65,11 +75,16 @@ export function getApiPath(path) {
 export function getWsUrl(path) {
   const base = getApiBaseUrl();
   if (base) {
-    const normalizedBase = base.endsWith("/") ? base : `${base}/`;
-    const url = new URL(path, normalizedBase);
-    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-    return url.toString();
+    try {
+      const normalizedBase = base.endsWith("/") ? base : `${base}/`;
+      const url = new URL(path, normalizedBase);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      return url.toString();
+    } catch (_) {
+      // Fall through to same-origin handling below.
+    }
   }
+  if (!hasWindow()) return path;
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
   return `${protocol}//${window.location.host}${path}`;
 }

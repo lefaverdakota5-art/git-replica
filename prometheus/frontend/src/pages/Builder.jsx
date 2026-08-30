@@ -322,8 +322,8 @@ export default function Builder() {
                 padding: { top: 12 },
                 automaticLayout: true,
               }}
-              onMount={(editor) => {
-                editor.addCommand(2097, handleSave);
+              onMount={(editor, monaco) => {
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, handleSave);
               }}
             />
           ) : (

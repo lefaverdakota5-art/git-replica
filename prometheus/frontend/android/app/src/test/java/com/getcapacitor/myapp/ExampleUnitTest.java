@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.lefaverdakota5art.prometheus;
 
 import static org.junit.Assert.*;
 
