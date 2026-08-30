@@ -80,6 +80,26 @@ prometheus/
 └── README.md
 ```
 
+## Android APK Build
+
+The frontend now includes a native Android wrapper powered by Capacitor.
+
+1. Start or deploy the FastAPI backend so your phone can reach it over the network.
+2. In `/home/runner/work/git-replica/git-replica/prometheus/frontend`, copy `.env.example` to `.env` if you want a default backend URL at build time.
+3. Build and sync the mobile app:
+   ```bash
+   cd prometheus/frontend
+   npm install
+   npm run android:sync
+   ```
+4. Generate a debug APK:
+   ```bash
+   npm run android:apk
+   ```
+5. Install the APK from `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+After the APK opens, go to **System Control → Settings** and set the backend URL if you did not bake one in during the build.
+
 ## License
 
 MIT
